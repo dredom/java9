@@ -67,6 +67,39 @@ public class EndSubscriptionTest {
         
     }
 
+    /**
+     * Use wait/notify for asynchronous process, inject notify Consumer into subscriber.
+     * This is the cleanest solution here.
+     * But still possible for notify() to execute before wait().
+     * But wait(100) is a failsafe.
+     */
+    @Test
+    public void whenSubscribeToIt_thenShouldConsumeAll_consumerNotify() throws Exception {
+        // given
+        SubmissionPublisher<String> publisher = new SubmissionPublisher<>();
+        EndSubscriber<String> subscriber = new EndSubscriber<>();
+        subscriber.setOnCompleteConsumer(sub -> {
+            System.out.println("onComplete hook");
+            synchronized(sub) {
+                sub.notifyAll();
+            }
+        });
+        publisher.subscribe(subscriber);
+        List<String> list = List.of("1", "x", "2", "x");
+        
+        // when
+        assertEquals(1, publisher.getNumberOfSubscribers());
+        list.forEach(publisher::submit);
+        publisher.close();
+        
+        // then
+        synchronized(subscriber) {
+            subscriber.wait(100);
+        }
+        assertEquals(list.size(), subscriber.consumedElements.size());
+        
+    }
+
 }   
     
     
